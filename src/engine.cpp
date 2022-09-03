@@ -3,14 +3,15 @@
 
 #include "engine.hpp"
 
+#include <string>
+
 #include <SDL.h>
 #include <glad/gl.h>
 #include <SDL_opengl.h>
 
 #include <spdlog/spdlog.h>
 
-static auto g_sdl_window_flags = SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE;
-static u64 g_delta_time = SDL_GetTicks64();
+constexpr auto g_sdl_window_flags = SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE;
 
 void Engine::init() {
 	if (SDL_Init(SDL_INIT_VIDEO) != 0) {
@@ -84,7 +85,7 @@ void Engine::init() {
 		spdlog::error("SDL: Failed to set SDL_GL_CONTEXT_FLAGS");
 		spdlog::error("SDL: error log:\n{}", SDL_GetError());
 	} else {
-		spdlog::trace("SDL: Set SDL_GL_CONTEXT_FLAGS");
+		spdlog::trace("SDL: Set SDL_GL_CONTEXT_FLAGS to {}", context_flags);
 		#if defined(GLE_DEBUG_CONTEXT)
 		spdlog::trace("SDL: Configured to use debug context");
 		#endif
@@ -120,7 +121,145 @@ void Engine::init() {
 
 	glViewport(0, 0, _window_extent.x, _window_extent.y);
 
+	init_gl_debug();
+	init_res();
+
 	m_is_init = true;
+}
+
+void Engine::init_gl_debug() {
+	spdlog::info("GL: Renderer = {}", (char*)glGetString(GL_RENDERER));
+	spdlog::info("GL: Version = {}", (char*)glGetString(GL_VERSION));
+
+	i32 context_flags = 0;
+	glGetIntegerv(GL_CONTEXT_FLAGS, &context_flags);
+
+	spdlog::debug("GL: Context flags = {}", context_flags);
+
+	if (context_flags & GL_CONTEXT_FLAG_DEBUG_BIT) {
+		glEnable(GL_DEBUG_OUTPUT);
+		glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
+		glDebugMessageCallback([](
+			GLenum source, 
+			GLenum type, 
+			GLuint id, 
+			GLenum severity, 
+			GLsizei length, 
+			const GLchar *message,
+      const void *userParam
+		){
+			std::string _source;
+			std::string _type;
+			std::string _severity;
+
+			switch (source)
+			{
+			case GL_DEBUG_SOURCE_API:
+				_source = "API";
+				break;
+			case GL_DEBUG_SOURCE_WINDOW_SYSTEM:
+				_source = "WINDOW SYSTEM";
+				break;
+			case GL_DEBUG_SOURCE_SHADER_COMPILER:
+				_source = "SHADER COMPILER";
+				break;
+			case GL_DEBUG_SOURCE_THIRD_PARTY:
+				_source = "THIRD PARTY";
+				break;
+			case GL_DEBUG_SOURCE_APPLICATION:
+				_source = "APPLICATION";
+				break;
+			case GL_DEBUG_SOURCE_OTHER:
+				_source = "UNKNOWN";
+				break;
+			default:
+				_source = "UNKNOWN";
+				break;
+			}
+
+			switch (type)
+			{
+			case GL_DEBUG_TYPE_ERROR:
+				_type = "ERROR";
+				break;
+
+			case GL_DEBUG_TYPE_DEPRECATED_BEHAVIOR:
+				_type = "DEPRECATED BEHAVIOR";
+				break;
+
+			case GL_DEBUG_TYPE_UNDEFINED_BEHAVIOR:
+				_type = "UDEFINED BEHAVIOR";
+				break;
+
+			case GL_DEBUG_TYPE_PORTABILITY:
+				_type = "PORTABILITY";
+				break;
+
+			case GL_DEBUG_TYPE_PERFORMANCE:
+				_type = "PERFORMANCE";
+				break;
+
+			case GL_DEBUG_TYPE_OTHER:
+				_type = "OTHER";
+				break;
+
+			case GL_DEBUG_TYPE_MARKER:
+				_type = "MARKER";
+				break;
+
+			default:
+				_type = "UNKNOWN";
+				break;
+			}
+
+			switch (severity)
+			{
+			case GL_DEBUG_SEVERITY_HIGH:
+				_severity = "HIGH";
+				break;
+			case GL_DEBUG_SEVERITY_MEDIUM:
+				_severity = "MEDIUM";
+				break;
+			case GL_DEBUG_SEVERITY_LOW:
+				_severity = "LOW";
+				break;
+			case GL_DEBUG_SEVERITY_NOTIFICATION:
+				_severity = "NOTIFICATION";
+				break;
+			default:
+				_severity = "UNKNOWN";
+				break;
+			}
+
+			const auto msg = fmt::format("{}: {} {} {} \n\t{}\n", id, _source, _severity, _type, message);
+			switch (severity)
+			{
+			case GL_DEBUG_SEVERITY_HIGH:
+				spdlog::error(msg);
+				break;
+			case GL_DEBUG_SEVERITY_MEDIUM:
+				spdlog::warn(msg);
+				break;
+			case GL_DEBUG_SEVERITY_LOW:
+				spdlog::warn(msg);
+				break;
+			case GL_DEBUG_SEVERITY_NOTIFICATION:
+				spdlog::info(msg);
+				break;
+			default:
+				spdlog::info(msg);
+				break;
+			}	
+		}, nullptr);
+		glDebugMessageControl(GL_DONT_CARE, GL_DONT_CARE, GL_DONT_CARE, 0, nullptr, GL_TRUE);
+		spdlog::info("GL: Debug output on");
+	} else {
+		spdlog::info("GL: Debug output off");
+	}
+}
+
+void Engine::init_res() {
+
 }
 
 void Engine::run() {
@@ -156,9 +295,6 @@ void Engine::run() {
 				glViewport(0, 0, width, height);
 			}
 		}
-
-		g_delta_time = SDL_GetTicks64() - g_delta_time;
-		spdlog::debug("SDL: g_delta_time = {}", g_delta_time);
 
 		draw();
 		SDL_GL_SwapWindow(_window);

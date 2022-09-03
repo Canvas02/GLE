@@ -8,6 +8,8 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+# option(GLE_DEBUG "Enable Debug Options in GLE" ON)
+
 find_package(OpenGL REQUIRED)
 find_package(glm CONFIG REQUIRED)
 find_package(spdlog CONFIG REQUIRED)
@@ -29,6 +31,8 @@ set(GLE_FILES_SRC
 	"src/main.cpp"
 	"src/engine.cpp"
 	"include/engine.hpp"
+	"src/shader.cpp"
+	"include/shader.hpp"
 
 	"include/common/types.hpp"
 )
@@ -39,7 +43,9 @@ set(GLE_FILES_RES_SHADERS
 add_executable(Engine ${GLE_FILES_SRC})
 target_include_directories(Engine PRIVATE "include")
 
+# if(GLE_DEBUG)
 target_compile_definitions(Engine PRIVATE GLE_DEBUG_CONTEXT=1)
+# endif(GLE_DEBUG)
 
 target_include_directories(Engine PRIVATE ${STB_INCLUDE_DIRS})
 target_link_libraries(Engine PRIVATE
